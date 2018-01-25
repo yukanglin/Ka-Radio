@@ -26,7 +26,7 @@
 #include "webserver.h"
 #include "webclient.h"
 #include "buffer.h"
-#include "extram.h"
+
 #include "vs1053.h"
 #include "ntp.h"
 #include "telnet.h"
@@ -78,16 +78,15 @@ struct device_settings *device;
 	printf(striWATERMARK,"testtask",uxHighWaterMark,xPortGetFreeHeapSize( ));
 */
 
-	gpio2_output_conf();
+
 	vTaskDelay(10);
 	
 	while(FlashCount==0xFF) {
-		if (ledStatus) gpio2_output_set(0);
+
 		vTaskDelay(FlashOff);
 		
 		if (ledStatus) // on led and save volume if changed
 		{		
-			gpio2_output_set(1);
 			vTaskDelay(FlashOn);
 		}	
 
@@ -116,7 +115,7 @@ struct device_settings *device;
 
 	FlashCount++;
 		
-	if ((ledStatus)&&(FlashCount == FlashOff)) gpio2_output_set(1);
+
 	if (FlashCount == FlashOn)
 	{
 		if (FlashVolume++ == 5) // every 10 sec
@@ -142,7 +141,6 @@ struct device_settings *device;
 	}		
 	if ((ledStatus)&&(FlashCount == FlashOn)) // on led and save volume if changed
 	{		
-		gpio2_output_set(0);
 		FlashCount = 0;
 	}	
 		
@@ -508,7 +506,7 @@ void user_init(void)
 	
 	VS1053_HW_init(); // init spi
 //	test_upgrade();
-	extramInit();
+	externram = false;
 	printf("\nuart speed: %d\n",uspeed);
 	initBuffer();
 	wifi_set_opmode_current(STATION_MODE);
@@ -534,6 +532,8 @@ void user_init(void)
 	printf(striTASK,"t3",pxCreatedTask);
 	xTaskCreate(serversTask, "t4", 360, NULL, 4, &pxCreatedTask); //380
 	printf(striTASK,"t4",pxCreatedTask);
+	xTaskCreate(nfcTask, "t5", 450, NULL, 4, &pxCreatedTask); //450
+	printf(striTASK,"t5",pxCreatedTask);
 
 	printf (striHEAP,xPortGetFreeHeapSize( ));
 }

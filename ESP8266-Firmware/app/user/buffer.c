@@ -4,7 +4,7 @@
 
 #include "buffer.h"
 #include "esp_common.h"
-#include "extram.h"
+
 /*
 #ifndef USE_EXTERNAL_SRAM
 	uint8_t buffer[BUFFER_SIZE];
@@ -43,22 +43,15 @@ ICACHE_FLASH_ATTR uint32_t getBufferFilled() {
 }
 
 ICACHE_FLASH_ATTR uint32_t bufferWrite(uint8_t *data, uint32_t size) {
-	if (externram==false){
-		uint32_t i;
-		for(i=0; i<size; i++) {
-			if(getBufferFree() == 0) { return i;}
-			buffer[wptr++] = data[i];
-			if(bempty) bempty = 0;
-			if(wptr == BUFFER_SIZE) wptr = 0;
-		}
-	}
-	else{
-		if(getBufferFree() < size) size = getBufferFree();
-		extramWrite(size, wptr, data);
-		wptr += size;
+	
+	uint32_t i;
+	for(i=0; i<size; i++) {
+		if(getBufferFree() == 0) { return i;}
+		buffer[wptr++] = data[i];
 		if(bempty) bempty = 0;
-		if(wptr >= BUFFER_SIZE) wptr -= BUFFER_SIZE;
+		if(wptr == BUFFER_SIZE) wptr = 0;
 	}
+	
 	return size;
 }
 
@@ -67,19 +60,14 @@ ICACHE_FLASH_ATTR uint32_t bufferRead(uint8_t *data, uint32_t size) {
 	uint32_t bf = getBufferFilled();
 	if(size > bf) size = bf;
 
-	if (externram==false){
-		for (i = 0; i < size; i++) {
-			if(bf == 0) { return i;}
-			data[i] = buffer[rptr++];
-			if(rptr == BUFFER_SIZE) rptr = 0;
-			if(rptr == wptr) bempty = 1;
-		}
-	} else{
-		extramRead(size, rptr, data);
-		rptr += size;
-		if(rptr >= BUFFER_SIZE) rptr -= BUFFER_SIZE;
+
+	for (i = 0; i < size; i++) {
+		if(bf == 0) { return i;}
+		data[i] = buffer[rptr++];
+		if(rptr == BUFFER_SIZE) rptr = 0;
 		if(rptr == wptr) bempty = 1;
 	}
+
 	return size;
 }
 

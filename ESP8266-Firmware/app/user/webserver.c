@@ -452,7 +452,13 @@ ICACHE_FLASH_ATTR void pathParse(char* str)
 }
 
 ICACHE_FLASH_ATTR void handlePOST(char* name, char* data, int data_size, int conn) {
-//printf("HandlePost %s\n",name);
+	int j;
+	printf("HandlePost %s\n",name);
+	printf("data size:%d, data:", data_size);
+	for(j= 0; j< data_size;j++){
+		printf("%c", data[j]);
+	}
+	printf("\n");
 //	char* head = NULL;
 	int i;
 	bool changed = false;

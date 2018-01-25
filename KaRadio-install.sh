@@ -32,7 +32,7 @@ sudo apt-get -y install yui-compressor
 echo install Ka-Radio
 #-----------------
 cd
-git clone --recursive https://github.com/karawin/Ka-Radio.git
+git clone --recursive https://github.com/yukanglin/Ka-Radio
 cd Ka-Radio/ESP8266-Firmware
 chmod +x *.sh
 chmod +x webpage/*.sh

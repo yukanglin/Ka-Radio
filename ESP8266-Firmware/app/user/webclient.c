@@ -1,7 +1,7 @@
 /*
  * Copyright 2016 karawin (http://www.karawin.fr)
 */
-
+#include "c_types.h"
 #include "webclient.h"
 #include "webserver.h"
 
@@ -12,11 +12,15 @@
 #include "esp_common.h"
 
 #include "freertos/semphr.h"
+#include "freertos/timers.h"
 
 #include "vs1053.h"
 #include "eeprom.h"
 #include "buffer.h"
-#include "interface.h"
+
+#include "RFID.h"
+#include "mful.h"
+// #include "sound_effect.h"
 
 enum clientStatus cstatus;
 //static uint32_t metacount = 0;
@@ -29,9 +33,6 @@ xSemaphoreHandle sConnect, sConnected, sDisconnect, sHeader;
 uint8_t once = 0;
 uint8_t volume = 0;
 uint8_t playing = 0;
-
-static const char* icyHeaders[] = { "icy-name:", "icy-notice1:", "icy-notice2:",  "icy-url:", "icy-genre:", "icy-br:","icy-description:","ice-audio-info:", "icy-metaint:" };
-
 
 char notfound[]={"Not Found"};
 char parEmty[] = {" "};
@@ -621,6 +622,7 @@ ICACHE_FLASH_ATTR void clientSetURL(char* url)
 ICACHE_FLASH_ATTR void clientSetPath(char* path)
 {
 	int l = strlen(path)+1;
+	
 	if (path[0] == 0xff) return; // wrong path
 	strcpy(clientPath, path);
 	kprintf(PSTR("##CLI.PATHSET#: %s\n"),clientPath);
@@ -681,7 +683,7 @@ ICACHE_FLASH_ATTR void clientDisconnect(const char* from)
 	}
 	xSemaphoreGive(sDisconnect);
 
-	if (!ledStatus) gpio2_output_set(1);
+
 	vTaskDelay(10);
 //	clearHeaders();
 }
@@ -702,7 +704,7 @@ IRAM_ATTR void clientReceiveCallback(int sockfd, char *pdata, int len)
 	char* t2;
 	bool  icyfound;
 
-//	if (cstatus != C_DATA) {os_printf("cstatus= %d\n",cstatus);  os_printf("Len=%d, Byte_list = %s\n",len,pdata);}
+	// if (cstatus != C_DATA) {os_printf("cstatus= %d\n",cstatus);  os_printf("Len=%d, Byte_list = %s\n",len,pdata);}
 	if (cstatus != C_DATA)
 	{
 		t1 = strstr(pdata, "404"); 
@@ -739,7 +741,7 @@ IRAM_ATTR void clientReceiveCallback(int sockfd, char *pdata, int len)
 		if (t1 != NULL) { // moved to a new address
 			if( strcmp(t1,"Found")||strcmp(t1,"Temporarily")||strcmp(t1,"Moved"))
 			{
-//printf("Len=%d,\n %s\n",len,pdata);
+// printf("Len=%d,\n %s\n",len,pdata);
 				kprintf(PSTR("Header: Moved%c"),0x0d);
 				clientDisconnect(PSTR("C_HDER"));
 				clientParsePlaylist(pdata);
@@ -753,7 +755,7 @@ IRAM_ATTR void clientReceiveCallback(int sockfd, char *pdata, int len)
 			cstatus = C_HEADER1;
 			do {
 				t1 = strstr(pdata, "\r\n\r\n"); // END OF HEADER
-//	os_printf("Header len: %d,  Header: %s\n",len,pdata);
+	// os_printf("Header len: %d,  Header: %s\n",len,pdata);
 				if ((t1 != NULL) && (t1 <= pdata+len-4)) 
 				{
 						t2 = strstr(pdata, "Internal Server Error"); 
@@ -1008,12 +1010,145 @@ if (l > 80) dump(inpdata,len);
 				if (once == 0)vTaskDelay(20);
 				VS1053_SetVolume(volume);
 				kprintf(CLIPLAY,0x0d,0x0a);
-				if (!ledStatus) gpio2_output_set(0);
+
 			}	
 		}
 	}
 }
 
+
+// const char URI_TYPE0[]  STORE_ATTR ICACHE_RODATA_ATTR = "\0";
+// const char URI_TYPE1[]  STORE_ATTR ICACHE_RODATA_ATTR = "http://www.";
+// const char URI_TYPE2[]  STORE_ATTR ICACHE_RODATA_ATTR = "https://www.";
+// const char URI_TYPE3[]  STORE_ATTR ICACHE_RODATA_ATTR = "http://";
+// const char URI_TYPE4[] STORE_ATTR ICACHE_RODATA_ATTR  = "https://";
+// const char URI_TYPE5[]  STORE_ATTR ICACHE_RODATA_ATTR = "tel:";
+// const char URI_TYPE6[]  STORE_ATTR ICACHE_RODATA_ATTR = "mailto:";
+// const char URI_TYPE7[] STORE_ATTR ICACHE_RODATA_ATTR  = "ftp://anonymous:anonymous@";
+// const char URI_TYPE8[] STORE_ATTR ICACHE_RODATA_ATTR  = "ftp://ftp.";
+// const char URI_TYPE9[] STORE_ATTR ICACHE_RODATA_ATTR  = "ftps://";
+// const char URI_TYPE10[] STORE_ATTR ICACHE_RODATA_ATTR  = "sftp://";
+// const char URI_TYPE11[] STORE_ATTR ICACHE_RODATA_ATTR  = "smb://";
+// const char *URI_TYPE_ARRAY[] = {URI_TYPE0, URI_TYPE1, URI_TYPE2, URI_TYPE3, URI_TYPE4, 
+// 	URI_TYPE5, URI_TYPE6, URI_TYPE7, URI_TYPE8, URI_TYPE9, URI_TYPE10, URI_TYPE11};
+
+
+
+IRAM_ATTR void nfcTask(void *pvParams){
+	portTickType xTimeNow, xTimeOld;
+	struct shoutcast_info* si;
+	int i, j;
+	signed portBASE_TYPE ret;
+	Uid uid, old_uid;
+	NdefMessage* message;
+	NdefRecord record;
+	char* url;
+	char* host;
+	char* path;
+	char port[5] = "80\0";
+	char buffer[256];
+	uint16_t urlLength;
+	uint16_t urlPrefixLength = 0;
+	int index =0;
+	int len;
+	vTaskDelay( 500/portTICK_RATE_MS );
+	RFID_HW_Init(); // init spi
+	vTaskDelay( 500/portTICK_RATE_MS );
+	RFID_PCD_Init();
+	vTaskDelay( 1000/portTICK_RATE_MS );
+	printf("RFID start\n");
+	while(1){
+		xTimeOld = xTimeNow;
+		
+		RFID_PCD_SoftPowerDown();
+		vTaskDelay( 400/portTICK_RATE_MS );
+		RFID_PCD_SoftPowerUp();
+		vTaskDelay( 10/portTICK_RATE_MS );
+		if(wifi_station_get_connect_status() != STATION_GOT_IP){
+			continue;
+		}
+		if(!mfulReadPassiveTargetID(&uid)){
+			continue;
+		}
+		//one shot if tag stay in field.
+		for(i = 0; i < sizeof(Uid); i++ ){
+			if(*(((char*)&uid)+i) != *(((char*)&old_uid)+i)){
+				break;
+			}
+		}	
+		xTimeNow = xTaskGetTickCount() *portTICK_RATE_MS;
+		// printf("tick rate:%d, xTimeNow:%d, xTimeOld:%d, time diff:%d, i:%d, playing:%d\n", portTICK_RATE_MS, xTimeNow, xTimeOld, xTimeNow- xTimeOld, i, playing);
+		if((i == sizeof(Uid)) && ((xTimeNow - xTimeOld) < 800) && playing){
+			continue;
+		}
+		memcpy(((char*)&old_uid), ((char*)&uid), sizeof(Uid));
+		
+		message = mfulRead(uid.uidByte, uid.size);
+		if(message == NULL){
+			continue;
+		}
+		
+		
+		
+		// printf(", message:%d,\n",message);
+		// printf(", message count:%d,\n",message->recordCount);
+		for(i = 0; i < message->recordCount; i++){
+			record = ndefMessageGetRecord(message, i);
+			// printf(", record:%d, typelength:%d, type:%c\n", &record, record.typeLength, record.type[0]);
+			if(record.typeLength == 1 && record.type[0] == 'U'){
+				//uri
+				char* p = &record.payload[1];
+				char* p_end = strstr(&record.payload[1], "/");	
+				if(p_end == NULL){
+					break;
+					p_end = &record.payload[0]+record.payloadLength;
+				}
+				host = (char*) malloc(p_end -p + 1);
+				memset(host, '\0', p_end -p + 1);
+				strncpy(host, p, p_end-p);
+				path = (char*) malloc(record.payloadLength - (p_end-p));
+				memset(path, '\0', (record.payloadLength - (p_end-p)));
+				strncpy(path, p_end, record.payloadLength - (p_end-p) -1);
+				// printf("host:%s, len:%d\n", host, strlen(host));
+				// printf("path:%s, len:%d\n", path, strlen(path));
+				if(host != NULL && path != NULL){
+					clientSetURL(host);
+					clientSetPath(path);
+					clientSetPort(atoi(port));
+					//disconnect client and stop play sound.
+					clientDisconnect(PSTR("sound effects instantplay"));
+					//play sound effect when player detected a tag successful.
+					index = 0;
+					bufferReset();
+					while(index < sound_effect1_size){
+						if(sound_effect1_size -index >= sizeof(buffer)){
+							len = sizeof(buffer);
+						}else{
+							len = sound_effect1_size - index;
+						}
+						flashRead(buffer, (int)sound_effect1 + index, len);
+						index += len;
+						while(getBufferFree() < len)						
+							vTaskDelay(20);//
+						bufferWrite(buffer, len);
+						if(!playing){
+							playing = 1;
+						}
+					}
+					
+					while(!getBufferEmpty()); //wait for sound effect stop.
+					playing = 0;
+					clientDisconnect(PSTR("nfc instantplay"));clientConnectOnce();
+				}
+				if(host != NULL) free(host);
+				if(path != NULL) free(path);				
+				break;
+			}
+		}
+		delNdefMessage(&message);
+		xTimeNow = xTaskGetTickCount() *portTICK_RATE_MS;
+	}
+}
 #define VSTASKBUF	1024
 uint8_t b[VSTASKBUF];
 IRAM_ATTR void vsTask(void *pvParams) { 
@@ -1034,8 +1169,12 @@ IRAM_ATTR void vsTask(void *pvParams) {
 	
 	VS1053_SPI_SpeedUp();
 	while(1) {
+		int x;
 		if(playing) {			
 			size = bufferRead(b, VSTASKBUF);
+			// for(x = 0; x < size; x++){
+			// 	printf(",%02x", b[x]);
+			// }
 			s = 0; 			
 			while(s < size) 
 			{
@@ -1091,7 +1230,7 @@ ICACHE_FLASH_ATTR void clientTask(void *pvParams) {
 	while(1) {
 		xSemaphoreGive(sConnected);
 		if(xSemaphoreTake(sConnect, portMAX_DELAY)) {
-
+			// printf("clientTask connecting\n");
 			//VS1053_HighPower();
 			xSemaphoreTake(sDisconnect, 0);	
 			sockfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -1133,7 +1272,7 @@ ICACHE_FLASH_ATTR void clientTask(void *pvParams) {
 				if (once == 0)
 					timeout.tv_sec = 10000; // bug *1000 for seconds
 				else
-					timeout.tv_sec = 3000; // bug *1000 for seconds
+					timeout.tv_sec = 5000; // bug *1000 for seconds
 
 				if (setsockopt (sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout)) < 0)
 					printf(strcSOCKET,"setsockopt",errno);
@@ -1172,7 +1311,7 @@ ICACHE_FLASH_ATTR void clientTask(void *pvParams) {
 						clientDisconnect(PSTR("try restart")); 
 						clientConnect();
 						playing=1; // force
-//						os_printf(CLIPLAY,0x0d,0x0a);
+						// os_printf(CLIPLAY,0x0d,0x0a);
 					}	
 					else if ((!playing)&&(once == 1)){ // nothing played. Force the read of the buffer
 						// some data not played						

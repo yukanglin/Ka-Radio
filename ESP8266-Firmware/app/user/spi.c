@@ -217,7 +217,6 @@ void spi_rx_byte_order(uint8 spi_no, uint8 byte_order){
 
 uint32 spi_transaction(uint8 spi_no, uint8 cmd_bits, uint16 cmd_data, uint32 addr_bits, uint32 addr_data, uint32 dout_bits, uint32 dout_data,
 				uint32 din_bits, uint32 dummy_bits){
-
 	if(spi_no > 1) return 0;  //Check for a valid SPI 
 
 	//code for custom Chip Select as GPIO PIN here
@@ -233,7 +232,7 @@ uint32 spi_transaction(uint8 spi_no, uint8 cmd_bits, uint16 cmd_data, uint32 add
 	//CMD ADDR and MOSI are set below to save on an extra if statement.
 //	if(cmd_bits) {SET_PERI_REG_MASK(SPI_USER(spi_no), SPI_USR_COMMAND);}
 //	if(addr_bits) {SET_PERI_REG_MASK(SPI_USER(spi_no), SPI_USR_ADDR);}
-	if(din_bits) {SET_PERI_REG_MASK(SPI_USER(spi_no), SPI_USR_MISO);}
+	if(din_bits) {SET_PERI_REG_MASK(SPI_USER(spi_no), SPI_DOUTDIN);}
 	if(dummy_bits) {SET_PERI_REG_MASK(SPI_USER(spi_no), SPI_USR_DUMMY);}
 //########## END SECTION ##########//
 
@@ -265,25 +264,26 @@ uint32 spi_transaction(uint8 spi_no, uint8 cmd_bits, uint16 cmd_data, uint32 add
 //########## Setup DOUT data ##########//
 	if(dout_bits) {
 		SET_PERI_REG_MASK(SPI_USER(spi_no), SPI_USR_MOSI); //enable MOSI function in SPI module
-	//copy data to W0
-	if(READ_PERI_REG(SPI_USER(spi_no))&SPI_WR_BYTE_ORDER) {
-		WRITE_PERI_REG(SPI_W0(spi_no), dout_data<<(32-dout_bits));
-	} else {
-
-		uint8 dout_extra_bits = dout_bits%8;
-
-		if(dout_extra_bits){
-			//if your data isn't a byte multiple (8/16/24/32 bits)and you don't have SPI_WR_BYTE_ORDER set, you need this to move the non-8bit remainder to the MSBs
-			//not sure if there's even a use case for this, but it's here if you need it...
-			//for example, 0xDA4 12 bits without SPI_WR_BYTE_ORDER would usually be output as if it were 0x0DA4, 
-			//of which 0xA4, and then 0x0 would be shifted out (first 8 bits of low byte, then 4 MSB bits of high byte - ie reverse byte order). 
-			//The code below shifts it out as 0xA4 followed by 0xD as you might require. 
-			WRITE_PERI_REG(SPI_W0(spi_no), ((0xFFFFFFFF<<(dout_bits - dout_extra_bits)&dout_data)<<(8-dout_extra_bits) | (0xFFFFFFFF>>(32-(dout_bits - dout_extra_bits)))&dout_data));
+		//copy data to W0
+		if(READ_PERI_REG(SPI_USER(spi_no))&SPI_WR_BYTE_ORDER) {
+			WRITE_PERI_REG(SPI_W0(spi_no), dout_data<<(32-dout_bits));
 		} else {
-			WRITE_PERI_REG(SPI_W0(spi_no), dout_data);
+
+			uint8 dout_extra_bits = dout_bits%8;
+
+			if(dout_extra_bits){
+				//if your data isn't a byte multiple (8/16/24/32 bits)and you don't have SPI_WR_BYTE_ORDER set, you need this to move the non-8bit remainder to the MSBs
+				//not sure if there's even a use case for this, but it's here if you need it...
+				//for example, 0xDA4 12 bits without SPI_WR_BYTE_ORDER would usually be output as if it were 0x0DA4, 
+				//of which 0xA4, and then 0x0 would be shifted out (first 8 bits of low byte, then 4 MSB bits of high byte - ie reverse byte order). 
+				//The code below shifts it out as 0xA4 followed by 0xD as you might require. 
+				WRITE_PERI_REG(SPI_W0(spi_no), ((0xFFFFFFFF<<(dout_bits - dout_extra_bits)&dout_data)<<(8-dout_extra_bits) | (0xFFFFFFFF>>(32-(dout_bits - dout_extra_bits)))&dout_data));
+			} else {
+				WRITE_PERI_REG(SPI_W0(spi_no), dout_data);
+			}
 		}
 	}
-	}
+
 //########## END SECTION ##########//
 
 //########## Begin SPI Transaction ##########//
@@ -307,6 +307,8 @@ uint32 spi_transaction(uint8 spi_no, uint8 cmd_bits, uint16 cmd_data, uint32 add
 	//Transaction completed
 	return 1; //success
 }
+
+
 
 ////////////////////////////////////////////////////////////////////////////////
 
