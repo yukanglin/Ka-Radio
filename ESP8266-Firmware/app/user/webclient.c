@@ -1088,7 +1088,7 @@ IRAM_ATTR void nfcTask(void *pvParams){
 			continue;
 		}
 		
-		
+		RFID_PCD_SoftPowerDown();
 		
 		// printf(", message:%d,\n",message);
 		// printf(", message count:%d,\n",message->recordCount);
@@ -1138,6 +1138,7 @@ IRAM_ATTR void nfcTask(void *pvParams){
 					
 					while(!getBufferEmpty()); //wait for sound effect stop.
 					playing = 0;
+					vTaskDelay( 400/portTICK_RATE_MS );
 					clientDisconnect(PSTR("nfc instantplay"));clientConnectOnce();
 				}
 				if(host != NULL) free(host);
