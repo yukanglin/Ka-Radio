@@ -1,4 +1,4 @@
-# ** ESP8266 & VS1053 Wifi WebRadio ** #
+# ** ESP8266 & VS1053 & SIC9310 NFC Wifi WebRadio ** #
 
 ### NFC-Ka-Radio, a WiFi shoutcast player based on ESP8266, SIC9310 and VS1053b chips</br>
 The repository is forked from https://github.com/karawin/Ka-Radio.git</br>
@@ -7,7 +7,7 @@ The repository is forked from https://github.com/karawin/Ka-Radio.git</br>
 ### Release 1.6.4- Built on 2018/01/25
 New:<br/>
 <ul>
-	<li>1.6.4 R0: add nfc function.</li>
+	<li>1.6.4 R0: add nfc function. remove external ram and LED function.</li>
 </ul>
 
 <br/>
@@ -22,6 +22,8 @@ After that, all next updates are done with the On The Air (OTA) feature.<BR/>
 <BR/><BR/>
 See also https://hackaday.io/project/11570-wifi-webradio-with-esp8266-and-vs1053 <br/>
 
+#### A Demo video
+https://www.facebook.com/washow.cc/videos/1738082452882707/
 
 #### Loading the esp8266
 The binaries are on ESP8266-Firmware/bin/upgrade/
@@ -42,6 +44,7 @@ The binaries are on ESP8266-Firmware/bin/upgrade/
 - It can parse URI record of NDEF message.
 - You can write URI record by a NFC phone/reader, before NFC-Ka-Radio device read it.
 - The NFC-Ka-Radio device will play a ringtone sound when it detect a right format of NFC tag.
+- How to make a URLs NDEF NFC tag. https://www.youtube.com/watch?v=DtzMie4U8RM
 
 #### Feedback
 Please tell me if you succeded or something more can be done, thanks.<br/>
@@ -61,12 +64,10 @@ see the https://github.com/yukanglin/Ka-Radio/blob/master/readme.txt file.
 - Stable<br />
 - tools to save and restore the stations database<br /><br />
 - prototype made with:<br />
--- http://fr.aliexpress.com/item/MB102-Breadboard-Power-Supply-Module-3-3V-5V-For-Solderless-Breadboard/2027279953.html (0.74 euros)<br />
 -- http://www.pcstore.com.tw/playrobot/M25817964.htm  (NODEMCU Lolin: 126 NTD)<br />
--- http://goods.ruten.com.tw/item/show?21649678441495  (625 NTD)<br />
--- http://www.ebay.fr/itm/131683794035?_trksid=p2060353.m2749.l2649&ssPageName=STRK%3AMEBIDX%3AIT  (1.05 euros)<br />
---
-http://www.pcstore.com.tw/washow/M19198772.htm (NFC Tag: 289 NTD)<br />
+-- http://goods.ruten.com.tw/item/show?21649678441495  (VS1053B: 625 NTD)<br />
+-- http://www.pcstore.com.tw/washow/M34048885.htm (SIC9310 module: 320 NTD)<br />
+-- http://www.pcstore.com.tw/washow/M19198772.htm (NFC Tag: 289 NTD)<br />
 -- some wires ...<br /><br />
 - Wiring: <br />
 From ESP8266_ESP12( 3.3 v) to VS1053 (5 v)<br />
@@ -86,6 +87,8 @@ GPIO04 to VS1053 DREQ<br />
 GPIO00 to VS1053 XRST<br />
 GPIO02<br />
 GPIO15 to VS1053 XCS<br />
+<img src="https://3.bp.blogspot.com/-hMCyYuvy2Kg/WmrlqgaPTfI/AAAAAAAAc_g/EW6cXlvp60c3NyWbg3EItXOlOurBtQE4QCLcBGAs/s640/WIRE.png" alt="screenshot" border=0> 
+
 <br/>
 If your chip has a /Vhold in place of /VBAT, the pin 7 must be wired to VCC (pin8)<br/>
 
